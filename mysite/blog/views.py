@@ -1,10 +1,12 @@
 import cv2
 import numpy as np
-from django.shortcuts import render, redirect
-from django.utils import timezone
+from django.shortcuts import render
 from django.http import HttpResponse
 from .models import Query
 from .forms import QueryForm
+from django.db import models
+from django.utils import timezone
+import math
 import io
 import av
 
@@ -12,7 +14,11 @@ def create_video(request):
 
     def generate_video(text: str): #передаётся текст из запроса, возвращается видео
             textlen = len(text)
-            width, height, fps = 100, 100, textlen * 2 # Параметы кадра
+            # if textlen < 20:
+            #     speed_of_text = 5
+            # else: 
+            speed_of_text = int(2 * math.sqrt(textlen))
+            width, height, fps = 100, 100, 30 # Параметы кадра
             output_memory_file = io.BytesIO()
             output = av.open(output_memory_file, 'w', format='mp4')
             stream = output.add_stream('h264', str(fps))
@@ -26,9 +32,9 @@ def create_video(request):
             font_color = (255, 255, 255)  # Белый цвет текста
 
             # Пройдемся по каждому кадру
-            for t in range(int(2.8 * fps)):  # 3 секунды с частотой (2*длину текста) кадра/сек 
+            for t in range(int(3 * fps)):  # 3 секунды с частотой (2*длину текста) кадра/сек 
                 frame.fill(0)# Очистка кадра
-                x -= 4  # Скорость бегущей строки
+                x -= speed_of_text  # Скорость бегущей строки
                 cv2.putText(frame, text, (x, y), font, font_scale, font_color, font_thickness) # Вот тут добавим текст
                 frame_text = av.VideoFrame.from_ndarray(frame, format='bgr24')
                 packet = stream.encode(frame_text)
@@ -42,8 +48,8 @@ def create_video(request):
             return mp4 #возвращаем объект memoryview
 
 
-    if request.method == 'POST':
-        form = QueryForm(request.POST)
+    if request.method == 'GET':
+        form = QueryForm(request.GET)
         if form.is_valid():
             text = form.cleaned_data['text']
             query = Query(text=text, timestamp=timezone.now())
